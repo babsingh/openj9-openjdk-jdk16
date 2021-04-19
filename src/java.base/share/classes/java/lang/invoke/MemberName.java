@@ -582,7 +582,6 @@ final class MemberName implements Member, Cloneable {
     public MemberName(Method m, boolean wantSpecial) {
         Objects.requireNonNull(m);
         // fill in vmtarget, vmindex while we have m in hand:
-        MethodHandleNatives.init(this, m);
         if (clazz == null) {  // MHN.init failed
             if (m.getDeclaringClass() == MethodHandle.class &&
                 isMethodHandleInvokeName(m.getName())) {
@@ -594,8 +593,7 @@ final class MemberName implements Member, Cloneable {
                 init(MethodHandle.class, m.getName(), type, flags);
                 if (isMethodHandleInvoke())
                     return;
-            }
-            if (m.getDeclaringClass() == VarHandle.class &&
+            } else if (m.getDeclaringClass() == VarHandle.class &&
                 isVarHandleMethodInvokeName(m.getName())) {
                 // The JVM did not reify this signature-polymorphic instance.
                 // Need a special case here.
@@ -605,9 +603,13 @@ final class MemberName implements Member, Cloneable {
                 init(VarHandle.class, m.getName(), type, flags);
                 if (isVarHandleMethodInvoke())
                     return;
+            } else {
+                MethodHandleNatives.init(this, m);
             }
-            throw new LinkageError(m.toString());
-        }
+            if (clazz == null) {
+                throw new LinkageError(m.toString());
+            }
+	}
         assert(isResolved() && this.clazz != null);
         this.name = m.getName();
         if (this.type == null)
