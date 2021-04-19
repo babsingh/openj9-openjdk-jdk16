@@ -62,6 +62,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+
 import static java.lang.invoke.LambdaForm.BasicType.V_TYPE;
 import static java.lang.invoke.MethodHandleImpl.Intrinsic;
 import static java.lang.invoke.MethodHandleNatives.Constants.*;
@@ -2439,13 +2442,19 @@ public class MethodHandles {
              * @throws LinkageError linkage error
              */
             Class<?> defineClass(boolean initialize, Object classData) {
-                Class<?> lookupClass = lookup.lookupClass();
-                ClassLoader loader = lookupClass.getClassLoader();
-                ProtectionDomain pd = (loader != null) ? lookup.lookupClassProtectionDomain() : null;
-                Class<?> c = SharedSecrets.getJavaLangAccess()
-                        .defineClass(loader, lookupClass, name, bytes, pd, initialize, classFlags, classData);
-                assert !isNestmate() || c.getNestHost() == lookupClass.getNestHost();
-                return c;
+                Class<?> ret = AccessController.doPrivileged(new PrivilegedAction<Class<?>>() {
+                    @Override
+                    public Class<?> run() {
+                        Class<?> lookupClass = lookup.lookupClass();
+                        ClassLoader loader = lookupClass.getClassLoader();
+                        ProtectionDomain pd = (loader != null) ? lookup.lookupClassProtectionDomain() : null;
+                        Class<?> c = SharedSecrets.getJavaLangAccess()
+                                .defineClass(loader, lookupClass, name, bytes, pd, initialize, classFlags, classData);
+                        assert !isNestmate() || c.getNestHost() == lookupClass.getNestHost();
+                        return c;
+                    }
+                });
+                return ret;
             }
 
             Lookup defineClassAsLookup(boolean initialize, Object classData) {
